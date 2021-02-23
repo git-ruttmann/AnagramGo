@@ -28,9 +28,9 @@ func (s *Scanner) ProcessWord(text string) {
 		return
 	}
 
-	// minLength := s.options.MinimumLength
-	// for i := word.Length + minLength + 1; i < s.anagram.Length-minLength; i++ {
-	for i := word.Length + 1; i < s.anagram.Length; i++ {
+	minLength := s.options.MinimumLength
+	for i := word.Length + minLength + 1; i < s.anagram.Length-minLength; i++ {
+		// for i := word.Length + 1; i < s.anagram.Length; i++ {
 		lengthCluster := s.storage.parts[i]
 		for j := 0; j < len(lengthCluster); j++ {
 			var target Part

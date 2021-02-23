@@ -7,6 +7,7 @@ import (
 
 // const maxChars = 36
 const maxChars = 16
+const keepText = true
 
 // Anagram data
 type Anagram struct {
@@ -98,7 +99,9 @@ func (w *Word) Combine(entry *Part, target *Part) bool {
 		}
 	}
 
-	target.text = entry.text + " " + w.text
+	if keepText {
+		target.text = entry.text + " " + w.text
+	}
 
 	return true
 }
@@ -108,7 +111,10 @@ func (w *Word) ToPart(target *Part) {
 	target.Remaining = w.Remaining
 	target.DoNotUseMask = w.DoNotUseMask
 	target.RestLength = w.RestLength
-	target.text = w.text
+
+	if keepText {
+		target.text = w.text
+	}
 }
 
 // Combine builds a word from an anagram and a text

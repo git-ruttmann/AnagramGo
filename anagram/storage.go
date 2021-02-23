@@ -7,6 +7,19 @@ type Storage struct {
 	anagram *Anagram
 }
 
+func estimateCapacity(index int) int {
+	switch {
+	case index < 3:
+		return 0
+	case index < 9:
+		return 1000000
+	case index < 12:
+		return 50000
+	default:
+		return 10000
+	}
+}
+
 // InitStorage initializes a storage
 func InitStorage(a *Anagram, options *Options) *Storage {
 	var s Storage
@@ -14,7 +27,7 @@ func InitStorage(a *Anagram, options *Options) *Storage {
 	s.parts = make([][]Part, a.Length)
 
 	for index := range s.parts {
-		s.parts[index] = make([]Part, 0, 100)
+		s.parts[index] = make([]Part, 0, estimateCapacity(index))
 	}
 
 	return &s
