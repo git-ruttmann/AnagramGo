@@ -5,6 +5,7 @@ type Scanner struct {
 	options  *Options
 	anagram  *Anagram
 	storage  *Storage
+	results  []Part
 	reporter func(string)
 }
 
@@ -13,6 +14,7 @@ func (s *Scanner) Initialize(anagram *Anagram, options *Options, reporter func(s
 	s.anagram = anagram
 	s.options = options
 	s.reporter = reporter
+	s.results = make([]Part, 0, 160000)
 	s.storage = InitStorage(anagram, options)
 }
 
@@ -22,8 +24,9 @@ func (s *Scanner) ProcessWord(text string) {
 		return
 	}
 
+	s.results = s.results[0:0]
+	// s.results = make([]Part, 100)
 	word := s.anagram.Combine(text)
-	results := make([]Part, 0, 100)
 	if word == nil {
 		return
 	}
@@ -35,8 +38,8 @@ func (s *Scanner) ProcessWord(text string) {
 		for j := 0; j < len(lengthCluster); j++ {
 			var target Part
 			if word.Combine(&lengthCluster[j], &target) {
-				results = append(results, target)
-				results[len(results)-1].Remaining = target.Remaining
+				s.results = append(s.results, target)
+				s.results[len(s.results)-1].Remaining = target.Remaining
 			}
 		}
 	}
@@ -48,7 +51,8 @@ func (s *Scanner) ProcessWord(text string) {
 		}
 	}
 
-	s.storage.addResults(results)
+	s.storage.addResults(s.results)
+	//	fmt.Println(text, ": ", len(s.results))
 	var part Part
 	word.ToPart(&part)
 	s.storage.Add(&part)
