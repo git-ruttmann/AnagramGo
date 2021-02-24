@@ -36,8 +36,13 @@ func (s *Scanner) ProcessWord(text string) {
 		// for i := word.Length + 1; i < s.anagram.Length; i++ {
 		lengthCluster := s.storage.parts[i]
 		for j := 0; j < len(lengthCluster); j++ {
+			part := &lengthCluster[j]
+			if (part.DoNotUseMask & word.UsedMask) != 0 {
+				continue
+			}
+
 			var target Part
-			if word.Combine(&lengthCluster[j], &target) {
+			if word.Combine(part, &target) {
 				s.results = append(s.results, target)
 				s.results[len(s.results)-1].Remaining = target.Remaining
 			}
