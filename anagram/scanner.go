@@ -5,7 +5,7 @@ type Scanner struct {
 	options  *Options
 	anagram  *Anagram
 	storage  *Storage
-	results  []Part
+	results  [][]Part
 	reporter func(string)
 }
 
@@ -14,8 +14,29 @@ func (s *Scanner) Initialize(anagram *Anagram, options *Options, reporter func(s
 	s.anagram = anagram
 	s.options = options
 	s.reporter = reporter
-	s.results = make([]Part, 0, 160000)
+	s.results = make([][]Part, anagram.Length)
+	for i := 0; i < anagram.Length; i++ {
+		s.results[i] = make([]Part, 0, 2048)
+	}
+
 	s.storage = InitStorage(anagram, options)
+}
+
+func processSlice(parts *[]Part, length int, results *[]Part, word *Word, completedChannel chan int, channelID int) {
+	for j := 0; j < length; j++ {
+		part := &(*parts)[j]
+		if (part.DoNotUseMask & word.UsedMask) != 0 {
+			continue
+		}
+
+		var target Part
+		if word.Combine(part, &target) {
+			*results = append(*results, target)
+			(*results)[len(*results)-1].Remaining = target.Remaining
+		}
+	}
+
+	completedChannel <- channelID
 }
 
 // ProcessWord processes a single word
@@ -24,7 +45,10 @@ func (s *Scanner) ProcessWord(text string) {
 		return
 	}
 
-	s.results = s.results[0:0]
+	for i := 0; i < len(s.results); i++ {
+		s.results[i] = s.results[i][0:0]
+	}
+
 	// s.results = make([]Part, 100)
 	word := s.anagram.Combine(text)
 	if word == nil {
@@ -32,21 +56,11 @@ func (s *Scanner) ProcessWord(text string) {
 	}
 
 	minLength := s.options.MinimumLength
+	completedChannel := make(chan int, 100)
+	channelCount := 0
 	for i := word.Length + minLength + 1; i < s.anagram.Length-minLength; i++ {
-		// for i := word.Length + 1; i < s.anagram.Length; i++ {
-		lengthCluster := s.storage.parts[i]
-		for j := 0; j < len(lengthCluster); j++ {
-			part := &lengthCluster[j]
-			if (part.DoNotUseMask & word.UsedMask) != 0 {
-				continue
-			}
-
-			var target Part
-			if word.Combine(part, &target) {
-				s.results = append(s.results, target)
-				s.results[len(s.results)-1].Remaining = target.Remaining
-			}
-		}
+		go processSlice(&s.storage.parts[i], len(s.storage.parts[i]), &s.results[i], word, completedChannel, i)
+		channelCount++
 	}
 
 	lengthCluster := s.storage.parts[word.Length]
@@ -56,7 +70,11 @@ func (s *Scanner) ProcessWord(text string) {
 		}
 	}
 
-	s.storage.addResults(s.results)
+	for ; channelCount > 0; channelCount-- {
+		i := <-completedChannel
+		s.storage.addResults(s.results[i])
+	}
+
 	//	fmt.Println(text, ": ", len(s.results))
 	var part Part
 	word.ToPart(&part)
