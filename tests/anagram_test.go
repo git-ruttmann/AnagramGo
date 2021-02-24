@@ -7,6 +7,27 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Test the deep serialization of anagram.Part over a channel
+func TestChannelCommunication(t *testing.T) {
+	a := anagram.InitizalizeAnagram("Best Secret")
+	part := createPart(&a, "test")
+	c := make(chan anagram.Part, 2)
+
+	c <- part
+	part = createPart(&a, "best")
+	c <- part
+
+	j := <-c
+	assert.NotEqual(t, part.DoNotUseMask, j.DoNotUseMask)
+
+	k := <-c
+	assert.Equal(t, part.DoNotUseMask, k.DoNotUseMask)
+	assert.Equal(t, part.Remaining[0], k.Remaining[0])
+	assert.Equal(t, part.Remaining[1], k.Remaining[1])
+	assert.Equal(t, part.Remaining[2], k.Remaining[2])
+	assert.Equal(t, part.Remaining[3], k.Remaining[3])
+}
+
 func TestAnalysis(t *testing.T) {
 	a := anagram.InitizalizeAnagram("Best Secret")
 
