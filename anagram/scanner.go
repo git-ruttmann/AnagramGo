@@ -22,9 +22,9 @@ func (s *Scanner) Initialize(anagram *Anagram, options *Options, reporter func(s
 	s.storage = InitStorage(anagram, options)
 }
 
-func processSlice(parts *[]Part, length int, results *[]Part, word *Word, completedChannel chan int, channelID int) {
-	for j := 0; j < length; j++ {
-		part := &(*parts)[j]
+func processSlice(parts []Part, results *[]Part, word *Word, completedChannel chan int, channelID int) {
+	for j := 0; j < len(parts); j++ {
+		part := &parts[j]
 		if (part.DoNotUseMask & word.UsedMask) != 0 {
 			continue
 		}
@@ -59,7 +59,7 @@ func (s *Scanner) ProcessWord(text string) {
 	completedChannel := make(chan int, 100)
 	channelCount := 0
 	for i := word.Length + minLength + 1; i < s.anagram.Length-minLength; i++ {
-		go processSlice(&s.storage.parts[i], len(s.storage.parts[i]), &s.results[i], word, completedChannel, i)
+		go processSlice(s.storage.parts[i], &s.results[i], word, completedChannel, i)
 		channelCount++
 	}
 
