@@ -7,7 +7,7 @@ import (
 
 // const maxChars = 36
 const maxChars = 16
-const keepText = true
+const keepText = false
 
 // Anagram data
 type Anagram struct {

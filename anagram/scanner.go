@@ -1,5 +1,7 @@
 package anagram
 
+import "fmt"
+
 const threadCount = 8
 
 // Scanner scans words
@@ -84,8 +86,10 @@ func (s *Scanner) processAcceptedWords() {
 			}
 		}
 
+		count := 0
 		for {
 			if t, ok := completedStageTwo[nextProcessedWordID]; ok {
+				count++
 				id := nextProcessedWordID
 				nextProcessedWordID++
 
@@ -106,6 +110,9 @@ func (s *Scanner) processAcceptedWords() {
 				t.Scan2(id)
 				t.HandleCompletionInSynchronizationThread(s.reporter)
 			} else {
+				if count > 0 {
+					fmt.Println(count, " ", len(threads))
+				}
 				break
 			}
 		}
