@@ -2,6 +2,9 @@ package anagramtests
 
 import (
 	"anagram"
+	"bufio"
+	"log"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -116,6 +119,31 @@ func TestScannerBestSecretAll(t *testing.T) {
 	stream.Final()
 
 	assert.Equal(t, 16, len(scanner.results))
+}
+
+func BenchmarkFullFile(b *testing.B) {
+	a := anagram.InitizalizeAnagram("Best Secret Aschheim")
+	var options anagram.Options
+
+	options.MinimumLength = 2
+	options.PrintEntries = false
+
+	resultCount := uint64(0)
+	processor := anagram.NewScanner(&a, &options, func(text string) {
+		resultCount++
+	})
+
+	file, err := os.Open("../../wordlist.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		processor.ProcessWord(scanner.Text())
+	}
+	processor.Final()
 }
 
 func createPart(a *anagram.Anagram, text string) anagram.Part {
