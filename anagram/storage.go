@@ -24,6 +24,7 @@ func estimateCapacity(index int) int {
 func InitStorage(a *Anagram, options *Options) *Storage {
 	var s Storage
 	s.options = options
+	s.anagram = a
 	s.parts = make([][]Part, a.Length)
 
 	for index := range s.parts {

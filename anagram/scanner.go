@@ -1,88 +1,130 @@
 package anagram
 
+const threadCount = 8
+
 // Scanner scans words
 type Scanner struct {
-	options  *Options
-	anagram  *Anagram
-	storage  *Storage
-	results  [][]Part
-	reporter func(string)
+	options      *Options
+	anagram      *Anagram
+	storage      *Storage
+	wordAnalyzer wordAnalyzer
+	endChannel   chan bool
+	endRequested bool
+	reporter     func(string)
 }
 
-// Initialize sets up the scanner
-func (s *Scanner) Initialize(anagram *Anagram, options *Options, reporter func(string)) {
-	s.anagram = anagram
-	s.options = options
-	s.reporter = reporter
-	s.results = make([][]Part, anagram.Length)
-	for i := 0; i < anagram.Length; i++ {
-		s.results[i] = make([]Part, 0, 2048)
+type wordAnalyzer struct {
+	texts chan string
+	words chan Word
+}
+
+// NewScanner initalizes a new scanner
+func NewScanner(anagram *Anagram, options *Options, reporter func(string)) (s *Scanner) {
+	s = &Scanner{
+		anagram:  anagram,
+		options:  options,
+		reporter: reporter,
 	}
 
 	s.storage = InitStorage(anagram, options)
+	s.endChannel = make(chan bool, 1)
+	s.wordAnalyzer.texts = make(chan string, 20)
+	s.wordAnalyzer.words = make(chan Word, 20)
+
+	go s.processAcceptedWords()
+	go s.scanWords()
+	return
 }
 
-func processSlice(parts []Part, results *[]Part, word *Word, completedChannel chan int, channelID int) {
-	for j := 0; j < len(parts); j++ {
-		part := &parts[j]
-		if (part.DoNotUseMask & word.UsedMask) != 0 {
-			continue
-		}
-
-		var target Part
-		if word.Combine(part, &target) {
-			*results = append(*results, target)
-			(*results)[len(*results)-1].Remaining = target.Remaining
+func (s *Scanner) scanWords() {
+	for text := range s.wordAnalyzer.texts {
+		if len(text) > s.options.MinimumLength {
+			if word := s.anagram.Combine(text); word != nil {
+				s.wordAnalyzer.words <- *word
+			}
 		}
 	}
 
-	completedChannel <- channelID
+	close(s.wordAnalyzer.words)
+}
+
+func (s *Scanner) processAcceptedWords() {
+	wordID := 0
+	nextProcessedWordID := 1
+	generateID := func() int {
+		wordID++
+		return wordID
+	}
+
+	stageOne := make(chan int, 1)
+	stageTwo := make(chan int, 1)
+	threads := make(map[int]*scanThread)
+	completedStageTwo := make(map[int]*scanThread)
+
+	for {
+		select {
+		case id := <-stageTwo:
+			t := threads[id]
+			delete(threads, id)
+			t.HandleCompletionInSynchronizationThread(s.reporter)
+
+		case id := <-stageOne:
+			t := threads[id]
+			completedStageTwo[id] = t
+
+		case word, ok := <-s.wordAnalyzer.words:
+			if ok {
+				id := generateID()
+				t := newScanThread(s.storage, &word)
+				threads[id] = t
+				t.StageOne()
+				go t.Scan(id, stageOne)
+			} else {
+				s.wordAnalyzer.words = nil
+			}
+		}
+
+		for {
+			if t, ok := completedStageTwo[nextProcessedWordID]; ok {
+				id := nextProcessedWordID
+				nextProcessedWordID++
+
+				delete(completedStageTwo, id)
+				delete(threads, id)
+				t.StageTwo()
+
+				// lots to do - start scanning for each thread in completed stage
+				if len(t.complete.parts) > 1000 {
+					for nid, nt := range completedStageTwo {
+						nt.StageTwo()
+						go nt.Scan(nid, stageOne)
+					}
+
+					completedStageTwo = make(map[int]*scanThread)
+				}
+
+				t.Scan2(id)
+				t.HandleCompletionInSynchronizationThread(s.reporter)
+			} else {
+				break
+			}
+		}
+
+		if s.endRequested && len(threads) == 0 && s.wordAnalyzer.words == nil {
+			s.endChannel <- true
+			break
+		}
+	}
 }
 
 // ProcessWord processes a single word
 func (s *Scanner) ProcessWord(text string) {
-	if len(text) <= s.options.MinimumLength {
-		return
-	}
-
-	for i := 0; i < len(s.results); i++ {
-		s.results[i] = s.results[i][0:0]
-	}
-
-	// s.results = make([]Part, 100)
-	word := s.anagram.Combine(text)
-	if word == nil {
-		return
-	}
-
-	minLength := s.options.MinimumLength
-	completedChannel := make(chan int, 100)
-	channelCount := 0
-	for i := word.Length + minLength + 1; i < s.anagram.Length-minLength; i++ {
-		go processSlice(s.storage.parts[i], &s.results[i], word, completedChannel, i)
-		channelCount++
-	}
-
-	lengthCluster := s.storage.parts[word.Length]
-	for j := 0; j < len(lengthCluster); j++ {
-		if word.IsComplete(&lengthCluster[j]) {
-			s.reporter(lengthCluster[j].text + " " + word.text)
-		}
-	}
-
-	for ; channelCount > 0; channelCount-- {
-		i := <-completedChannel
-		s.storage.addResults(s.results[i])
-	}
-
-	//	fmt.Println(text, ": ", len(s.results))
-	var part Part
-	word.ToPart(&part)
-	s.storage.Add(&part)
+	s.wordAnalyzer.texts <- text
 }
 
-func (s *Storage) addResults(results []Part) {
-	for _, result := range results {
-		s.Add(&result)
-	}
+// Final closed the scanner, call after the last word
+func (s *Scanner) Final() {
+	close(s.wordAnalyzer.texts)
+	s.endRequested = true
+	<-s.endChannel
 }

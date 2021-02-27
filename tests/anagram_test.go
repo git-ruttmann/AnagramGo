@@ -71,6 +71,7 @@ func TestScannerBestSecretDouble(t *testing.T) {
 	scanner := createTestScanner("Best Secret")
 	scanner.scanner.ProcessWord("Best")
 	scanner.scanner.ProcessWord("Secret")
+	scanner.scanner.Final()
 
 	assert.Equal(t, 1, len(scanner.results))
 }
@@ -80,6 +81,7 @@ func TestScannerBestSecretTriple(t *testing.T) {
 	scanner.scanner.ProcessWord("bet")
 	scanner.scanner.ProcessWord("erst")
 	scanner.scanner.ProcessWord("sec")
+	scanner.scanner.Final()
 
 	assert.Equal(t, 1, len(scanner.results))
 }
@@ -111,6 +113,7 @@ func TestScannerBestSecretAll(t *testing.T) {
 	stream.ProcessWord("secrets")
 	stream.ProcessWord("sect")
 	stream.ProcessWord("sects")
+	stream.Final()
 
 	assert.Equal(t, 16, len(scanner.results))
 }
@@ -123,19 +126,20 @@ func createPart(a *anagram.Anagram, text string) anagram.Part {
 }
 
 type testScanner struct {
-	scanner anagram.Scanner
+	scanner *anagram.Scanner
 	results []string
 }
 
 func createTestScanner(anagramText string) *testScanner {
 	a := anagram.InitizalizeAnagram(anagramText)
-	o := anagram.Options{MinimumLength: 2}
-	test := testScanner{scanner: anagram.Scanner{}, results: make([]string, 0)}
-
-	reporter := func(text string) {
-		test.results = append(test.results, text)
+	o := anagram.Options{MinimumLength: 2, PrintEntries: true}
+	var test testScanner
+	test = testScanner{
+		scanner: anagram.NewScanner(&a, &o, func(text string) {
+			test.results = append(test.results, text)
+		}),
+		results: make([]string, 0),
 	}
 
-	test.scanner.Initialize(&a, &o, reporter)
 	return &test
 }

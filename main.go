@@ -12,13 +12,12 @@ import (
 func main() {
 	a := anagram.InitizalizeAnagram("Best Secret Aschheim")
 	var options anagram.Options
-	var processor anagram.Scanner
 
 	options.MinimumLength = 2
 	options.PrintEntries = false
 
 	resultCount := uint64(0)
-	processor.Initialize(&a, &options, func(text string) {
+	processor := anagram.NewScanner(&a, &options, func(text string) {
 		resultCount++
 		if options.PrintEntries {
 			fmt.Println(text)
@@ -35,6 +34,7 @@ func main() {
 	for scanner.Scan() {
 		processor.ProcessWord(scanner.Text())
 	}
+	processor.Final()
 
 	if err := scanner.Err(); err != nil {
 		log.Fatal(err)
