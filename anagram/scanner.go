@@ -1,7 +1,5 @@
 package anagram
 
-import "fmt"
-
 const threadCount = 8
 
 // Scanner scans words
@@ -62,6 +60,7 @@ func (s *Scanner) processAcceptedWords() {
 	stageTwo := make(chan int, 1)
 	threads := make(map[int]*scanThread)
 	completedStageTwo := make(map[int]*scanThread)
+	wordChannel := s.wordAnalyzer.words
 
 	for {
 		select {
@@ -74,7 +73,7 @@ func (s *Scanner) processAcceptedWords() {
 			t := threads[id]
 			completedStageTwo[id] = t
 
-		case word, ok := <-s.wordAnalyzer.words:
+		case word, ok := <-wordChannel:
 			if ok {
 				id := generateID()
 				t := newScanThread(s.storage, &word)
@@ -86,10 +85,8 @@ func (s *Scanner) processAcceptedWords() {
 			}
 		}
 
-		count := 0
 		for {
 			if t, ok := completedStageTwo[nextProcessedWordID]; ok {
-				count++
 				id := nextProcessedWordID
 				nextProcessedWordID++
 
@@ -110,13 +107,18 @@ func (s *Scanner) processAcceptedWords() {
 				t.Scan2(id)
 				t.HandleCompletionInSynchronizationThread(s.reporter)
 			} else {
-				if count > 0 {
-					fmt.Println(count, " ", len(threads))
-				}
 				break
 			}
 		}
 
+		// throttle number of parallel processed words
+		if len(threads) > 3000 {
+			wordChannel = nil
+		} else {
+			wordChannel = s.wordAnalyzer.words
+		}
+
+		// finish the processing function
 		if s.endRequested && len(threads) == 0 && s.wordAnalyzer.words == nil {
 			s.endChannel <- true
 			break
